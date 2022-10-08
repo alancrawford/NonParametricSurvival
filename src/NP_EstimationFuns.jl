@@ -13,11 +13,11 @@ function kaplanmeier(d::Vector,r::Vector)
 	S = accumulate(*, (1 .- d./r))
 	top =	accumulate(+, (d./r)./(r .- d))
 	V = top.*(S.*S)
-	term = log.( (r .- d)./d )
+	term = log.( (r .- d)./r )
 	for (i,term_i) in enumerate(term)
 		isinf(term_i) ? term[i] = 0. : nothing
 	end
-	bottom = accumulate(+, term)
+	bottom = accumulate(+, term)   # sqrt(1 / log(S)²) = 1 / ∑ln(1 .- d./r)
 	sigma = sqrt.(top)./bottom
 	return survivor(S, V, sqrt.(V), sigma)
 end

@@ -1,39 +1,43 @@
 
 # Data Setup 
 
-function get_bin_counts(df::DataFrame, tvar::Symbol, failvar::Symbol)
-	df[:ones] = 1
-	cts = sort(
-			@based_on(DataFrames.groupby(df, [tvar, failvar]), 
-			counts = sum(:ones)),
-			cols = order(:time)
-		)
-end
+get_bin_counts(df::DataFrame, tvar::Symbol, failvar::Symbol) =
+	sort!( combine(groupby(df, [tvar, failvar]), nrow ), tvar )
 
-function np_survival(df::DataFrame, tvar::Symbol, failvar::Symbol)
-	d = zeros(maximum(df[tvar]))
-	m = zeros(maximum(df[tvar]))
 
-	dfc = get_bin_counts(df, tvar, failvar)
+get_bin_counts(df::DataFrame, tvar::Symbol, failvar::Symbol, wgt_var::Symbol) =
+	sort!(combine(groupby(df, [tvar, failvar]), wgt_var => sum => :nrow), tvar)
+
+
+
+function np_survival(df::DataFrame, tvar::Symbol, failvar::Symbol; kwargs...)
+	kwd = Dict(kwargs)
+	d = zeros(maximum(df[!, tvar]))
+	m = zeros(maximum(df[!, tvar]))
+
+	if !haskey(kwd, :wgt_var)
+		dfc = get_bin_counts(df, tvar, failvar)
+	else 
+		dfc = get_bin_counts(df, tvar, failvar, kwd[:wgt_var])
+	end
 	for dfr in eachrow(dfc)
 		if dfr[failvar].==1
-			d[dfr[tvar]] = dfr[:counts] 
+			d[dfr[tvar]] = dfr[:nrow] 
 		else 
-			m[dfr[tvar]] = dfr[:counts] 
+			m[dfr[tvar]] = dfr[:nrow] 
 		end
 	end
 
 	dm = d + m
 	cumu_dm = accumulate(+, dm)
-	desc_dm = maximum(cumu_dm) - cumu_dm
 
-	r = [desc_dm[1]]
+	r = [cumu_dm[end]]
 	for (n, exits) in enumerate(dm)
 		push!(r, r[n] - exits)
 	end
 	pop!(r)
 
-	t = find(dm)
+	t = findall(x->x!=0. , dm)
 
 	return np_survival(t,d[t],m[t],r[t])
 end
